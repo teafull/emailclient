@@ -39,6 +39,13 @@ const prefixSubject = (prefix, subject) => {
   return subject.startsWith(prefix) ? subject : `${prefix}${subject}`;
 };
 
+const formatCc = (cc) => {
+  if (!cc) {
+    return [];
+  }
+  return Array.isArray(cc) ? cc : [cc];
+};
+
 const openComposeWithAction = async (action) => {
   const mail = selectedMail.value;
   if (!mail) {
@@ -69,7 +76,7 @@ const openComposeWithAction = async (action) => {
 
   if (action === "replyAll") {
     form.to = mail.email || "";
-    form.cc = mail.cc || "";
+    form.cc = formatCc(mail.cc).join(", ");
     form.subject = prefixSubject("Re: ", mail.subject);
     form.content = `${replyQuote}${signature}`;
     return;
@@ -80,6 +87,7 @@ const openComposeWithAction = async (action) => {
     form.content = `${forwardQuote}${signature}`;
   }
 };
+
 
 
 
@@ -259,7 +267,8 @@ const mails = [
   {
     sender: "技术支持团队",
     email: "support@company.com",
-    cc: "ops@company.com",
+    cc: ["ops@company.com", "it@company.com", "sec@company.com", "ops2@company.com"],
+
     subject: "系统维护通知",
     preview: "本周六凌晨2:00-4:00将进行系统维护...",
     content:
@@ -272,7 +281,8 @@ const mails = [
   {
     sender: "设计部门",
     email: "design@company.com",
-    cc: "pm@company.com",
+    cc: ["pm@company.com", "ux@company.com"],
+
     subject: "新版本UI设计稿反馈",
     preview: "请查看附件中的设计稿并提供反馈意见...",
     content: "新版本UI设计稿已更新，请重点关注导航与列表样式。期待今天下午前给出反馈建议。",
@@ -490,6 +500,27 @@ const todos = ref([
             <span>发件人：{{ selectedMail.sender }}</span>
             <span>时间：{{ selectedMail.time }}</span>
           </div>
+          <div class="detail-cc" v-if="formatCc(selectedMail.cc).length">
+            <span class="detail-cc-label">抄送：</span>
+            <el-tooltip
+              v-if="formatCc(selectedMail.cc).length > 3"
+              placement="top"
+              :content="formatCc(selectedMail.cc).join('、')"
+            >
+              <div class="detail-cc-tags">
+                <el-tag v-for="cc in formatCc(selectedMail.cc).slice(0, 3)" :key="cc" size="small">
+                  {{ cc }}
+                </el-tag>
+                <el-tag size="small" type="info">+{{ formatCc(selectedMail.cc).length - 3 }}</el-tag>
+              </div>
+            </el-tooltip>
+            <div v-else class="detail-cc-tags">
+              <el-tag v-for="cc in formatCc(selectedMail.cc)" :key="cc" size="small">
+                {{ cc }}
+              </el-tag>
+            </div>
+          </div>
+
           <div class="detail-content">
             {{ selectedMail.content || selectedMail.preview }}
           </div>
@@ -980,6 +1011,26 @@ const todos = ref([
   color: #4c5b75;
   white-space: pre-wrap;
 }
+
+.detail-cc {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: #6f7f98;
+}
+
+.detail-cc-label {
+  font-weight: 600;
+}
+
+.detail-cc-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 
 .mail-signature {
   color: #7a8aa6;
