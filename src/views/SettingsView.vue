@@ -14,9 +14,25 @@ const props = defineProps({
 
 const emit = defineEmits(["update:labels", "update:settings"]);
 
+const defaultLlm = {
+  enabled: true,
+  provider: "OpenAI",
+  model: "gpt-4o-mini",
+  apiKey: "",
+  endpoint: "",
+  tone: "专业"
+};
+
+const buildSettings = (value) => ({
+  ...value,
+  llm: { ...defaultLlm, ...(value?.llm || {}) }
+});
+
 const localLabels = ref(Array.isArray(props.labels) ? [...props.labels] : []);
-const localSettings = ref({ ...props.settings });
+const localSettings = ref(buildSettings(props.settings));
 const signatureRef = ref(null);
+const providerOptions = ["OpenAI", "DeepSeek", "Qwen", "Claude", "Azure OpenAI"];
+
 
 const textToHtml = (value) =>
   (value || "")
@@ -49,7 +65,7 @@ watch(
 watch(
   () => props.settings,
   (value) => {
-    localSettings.value = { ...value };
+    localSettings.value = buildSettings(value);
     if (!localSettings.value.signatureHtml && localSettings.value.signature) {
       localSettings.value.signatureHtml = textToHtml(localSettings.value.signature);
     }
@@ -57,6 +73,7 @@ watch(
   },
   { deep: true }
 );
+
 
 watch(
   localLabels,
@@ -199,9 +216,10 @@ const themeOptions = ["专业蓝", "深邃蓝", "极简白"];
       </el-form>
     </el-card>
 
-    <el-card shadow="never" class="settings-card">
+    <el-card shadow="never" class="settings-card settings-card--wide">
       <div class="section-title">写信偏好</div>
-      <el-form :model="localSettings" label-width="90px" class="settings-form">
+
+      <el-form :model="localSettings" label-width="100px" class="settings-form">
         <el-form-item label="默认签名">
           <div class="signature-editor">
             <div class="signature-toolbar">
@@ -231,7 +249,35 @@ const themeOptions = ["专业蓝", "深邃蓝", "极简白"];
     </el-card>
 
     <el-card shadow="never" class="settings-card">
+      <div class="section-title">大模型配置</div>
+      <el-form :model="localSettings" label-width="90px" class="settings-form">
+        <el-form-item label="启用">
+          <el-switch v-model="localSettings.llm.enabled" />
+        </el-form-item>
+        <el-form-item label="服务商">
+          <el-select v-model="localSettings.llm.provider" placeholder="请选择服务商" style="width: 200px">
+            <el-option v-for="item in providerOptions" :key="item" :label="item" :value="item" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="模型">
+          <el-input v-model="localSettings.llm.model" placeholder="例如 gpt-4o-mini" />
+        </el-form-item>
+        <el-form-item label="API Key">
+          <el-input v-model="localSettings.llm.apiKey" type="password" show-password placeholder="请输入 API Key" />
+        </el-form-item>
+        <el-form-item label="Endpoint">
+          <el-input v-model="localSettings.llm.endpoint" placeholder="可选，自定义接入地址" />
+        </el-form-item>
+        <el-form-item label="写作风格">
+          <el-input v-model="localSettings.llm.tone" placeholder="例如：专业、简洁、礼貌" />
+        </el-form-item>
+      </el-form>
+      <div class="settings-tip">用于在写邮件/回复时生成内容，当前为本地模拟。</div>
+    </el-card>
+
+    <el-card shadow="never" class="settings-card">
       <div class="section-title">标签设置</div>
+
       <div class="label-manager">
         <div class="label-list">
           <el-tag v-for="label in localLabels" :key="label" closable @close="removeLabel(label)">
@@ -269,9 +315,24 @@ const themeOptions = ["专业蓝", "深邃蓝", "极简白"];
 <style scoped>
 .settings-panel {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   gap: 16px;
 }
+
+.settings-header {
+  flex: 0 0 100%;
+}
+
+.settings-card {
+  flex: 1 1 320px;
+  min-width: 280px;
+}
+
+.settings-card--wide {
+  flex: 2 1 520px;
+}
+
+
 
 .settings-header {
   background: #ffffff;
@@ -354,6 +415,13 @@ const themeOptions = ["专业蓝", "深邃蓝", "极简白"];
   font-size: 12px;
   color: #8a98b2;
 }
+
+.settings-tip {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #8a98b2;
+}
+
 
 .upload-btn {
   display: inline-flex;

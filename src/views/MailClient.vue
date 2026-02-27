@@ -107,6 +107,42 @@ const addTodoFromMail = (mail) => {
   ElMessage.success("已加入待办");
 };
 
+const extractQuoteHtml = (content) => {
+  if (!content) {
+    return "";
+  }
+  const forwardIndex = content.indexOf("--- 转发邮件 ---");
+  if (forwardIndex >= 0) {
+    return content.slice(forwardIndex - 3);
+  }
+  const match = content.match(/<blockquote[\s\S]*<\/blockquote>/);
+  return match ? match[0] : "";
+};
+
+const generateMailContent = () => {
+  const form = composeRef.value?.form;
+  if (!form) {
+    return;
+  }
+  const llm = { ...defaultSettings.llm, ...(settings.value.llm || {}) };
+  if (!llm.enabled) {
+    ElMessage.warning("大模型已关闭");
+    return;
+  }
+  if (!llm.model) {
+    ElMessage.warning("请在设置中填写模型名称");
+    return;
+  }
+  const tone = llm.tone || "专业";
+  const subject = form.subject || "邮件主题";
+  const receiver = form.to || "收件人";
+  const signature = getSignatureBlock(true);
+  const quoteHtml = extractQuoteHtml(form.content);
+  const body = `<p>${receiver} 您好：</p><p>关于“${subject}”，我已基于${tone}风格生成一版内容草稿，请您查看并调整细节。</p><p>如有需要补充的信息，请告诉我，我会继续完善。</p>`;
+  form.content = `${body}${quoteHtml}${signature}`;
+  ElMessage.success("已生成邮件草稿");
+};
+
 const openComposeNew = async () => {
   composeVisible.value = true;
   await nextTick();
@@ -122,6 +158,7 @@ const openComposeNew = async () => {
 };
 
 const handleSend = async () => {
+
 
   try {
     await composeRef.value?.validate();
@@ -193,14 +230,25 @@ const defaultSettings = {
   signatureHtml: "张三<br />市场与运营部<br />电话：010-12345678",
   notify: true,
   autoDraft: true,
-  theme: "专业蓝"
+  theme: "专业蓝",
+  llm: {
+    enabled: true,
+    provider: "OpenAI",
+    model: "gpt-4o-mini",
+    apiKey: "",
+    endpoint: "",
+    tone: "专业"
+  }
 };
 
+const storedSettings = readStorage("mailSettings", {});
 
 const settings = ref({
   ...defaultSettings,
-  ...readStorage("mailSettings", {})
+  ...storedSettings,
+  llm: { ...defaultSettings.llm, ...(storedSettings.llm || {}) }
 });
+
 
 const getSignatureHtml = () => {
   if (settings.value.signatureHtml) {
@@ -478,10 +526,12 @@ const todos = ref([
         <ComposeMail ref="composeRef" />
         <template #footer>
           <el-button @click="composeVisible = false">取消</el-button>
+          <el-button @click="generateMailContent">AI生成</el-button>
           <el-button @click="saveDraft">保存草稿</el-button>
           <el-button type="primary" @click="handleSend">发送</el-button>
         </template>
       </el-dialog>
+
 
       <el-dialog v-model="detailVisible" title="邮件详情" width="620px">
         <div v-if="selectedMail" class="detail-body">
