@@ -178,11 +178,11 @@ const escapeHtml = (value) =>
 const textToHtml = (value) => escapeHtml(value).replace(/\n/g, "<br />");
 
 const defaultSettings = {
-  displayName: "张风",
+  displayName: "张三",
   title: "市场与运营部",
-  email: "zhangfeng@company.com",
-  signature: "张风\n市场与运营部\n电话：010-12345678",
-  signatureHtml: "张风<br />市场与运营部<br />电话：010-12345678",
+  email: "zhangsan@company.com",
+  signature: "张三\n市场与运营部\n电话：010-12345678",
+  signatureHtml: "张三<br />市场与运营部<br />电话：010-12345678",
   notify: true,
   autoDraft: true,
   theme: "专业蓝"
