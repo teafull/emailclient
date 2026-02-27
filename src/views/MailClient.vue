@@ -1,19 +1,38 @@
 <script setup>
-import { ref, nextTick } from "vue";
+import { ref, nextTick, computed, watch } from "vue";
+
 import { ElMessage } from "element-plus";
 import ComposeMail from "./ComposeMail.vue";
+import SettingsView from "./SettingsView.vue";
 
 const composeVisible = ref(false);
 const composeRef = ref(null);
 const detailVisible = ref(false);
 const selectedMail = ref(null);
+const currentView = ref("mail");
+const activeMenu = ref("收件箱");
+
+const handleMenuSelect = (index) => {
+  activeMenu.value = index;
+  currentView.value = index === "设置" ? "settings" : "mail";
+};
 
 const openMailDetail = (mail) => {
   selectedMail.value = mail;
   detailVisible.value = true;
 };
 
+const getSignatureBlock = (leadingBlank = true) => {
+  const signatureHtml = getSignatureHtml();
+  if (!signatureHtml) {
+    return "";
+  }
+  return `${leadingBlank ? "<br /><br />" : ""}<div class="mail-signature">--<br />${signatureHtml}</div>`;
+};
+
+
 const prefixSubject = (prefix, subject) => {
+
   if (!subject) {
     return prefix.trim();
   }
@@ -36,9 +55,10 @@ const openComposeWithAction = async (action) => {
   form.subject = "";
   form.content = "";
 
-  const signature = "\n\n--\n张风\n市场与运营部\n电话：010-12345678";
-  const replyQuote = `\n\n在 ${mail.time}，${mail.sender} 写道：\n> ${(mail.content || mail.preview).replace(/\n/g, "\n> ")}`;
-  const forwardQuote = `\n\n--- 转发邮件 ---\n发件人：${mail.sender}\n时间：${mail.time}\n主题：${mail.subject}\n\n${mail.content || mail.preview}`;
+  const signature = getSignatureBlock(true);
+  const replyQuoteBody = textToHtml(mail.content || mail.preview);
+  const replyQuote = `<p>在 ${mail.time}，${mail.sender} 写道：</p><blockquote>${replyQuoteBody}</blockquote>`;
+  const forwardQuote = `<p>--- 转发邮件 ---</p><p>发件人：${mail.sender}<br />时间：${mail.time}<br />主题：${mail.subject}</p><p>${textToHtml(mail.content || mail.preview)}</p>`;
 
   if (action === "reply") {
     form.to = mail.email || "";
@@ -62,6 +82,9 @@ const openComposeWithAction = async (action) => {
 };
 
 
+
+
+
 const addTodoFromMail = (mail) => {
   if (!mail) {
     return;
@@ -76,7 +99,22 @@ const addTodoFromMail = (mail) => {
   ElMessage.success("已加入待办");
 };
 
+const openComposeNew = async () => {
+  composeVisible.value = true;
+  await nextTick();
+  const form = composeRef.value?.form;
+  if (!form) {
+    return;
+  }
+  form.to = "";
+  form.cc = "";
+  form.subject = "";
+  const signature = getSignatureBlock(false);
+  form.content = signature ? signature : "";
+};
+
 const handleSend = async () => {
+
   try {
     await composeRef.value?.validate();
     ElMessage.success("邮件已发送");
@@ -117,6 +155,87 @@ const saveDraft = () => {
   ElMessage.success("草稿已保存");
 };
 
+const readStorage = (key, fallback) => {
+  const raw = localStorage.getItem(key);
+  if (!raw) {
+    return fallback;
+  }
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    return fallback;
+  }
+};
+
+const escapeHtml = (value) =>
+  (value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
+const textToHtml = (value) => escapeHtml(value).replace(/\n/g, "<br />");
+
+const defaultSettings = {
+  displayName: "张风",
+  title: "市场与运营部",
+  email: "zhangfeng@company.com",
+  signature: "张风\n市场与运营部\n电话：010-12345678",
+  signatureHtml: "张风<br />市场与运营部<br />电话：010-12345678",
+  notify: true,
+  autoDraft: true,
+  theme: "专业蓝"
+};
+
+
+const settings = ref({
+  ...defaultSettings,
+  ...readStorage("mailSettings", {})
+});
+
+const getSignatureHtml = () => {
+  if (settings.value.signatureHtml) {
+    return settings.value.signatureHtml;
+  }
+  if (settings.value.signature) {
+    return textToHtml(settings.value.signature);
+  }
+  return "";
+};
+
+
+const labels = ref(readStorage("mailLabels", ["重要", "工作", "个人"]).filter(Boolean));
+
+const labelToneMap = {
+  重要: "danger",
+  工作: "work",
+  个人: "personal"
+};
+
+const labelsWithTone = computed(() =>
+  labels.value.map((name) => ({
+    name,
+    tone: labelToneMap[name] || "default"
+  }))
+);
+
+watch(
+  settings,
+  (value) => {
+    localStorage.setItem("mailSettings", JSON.stringify(value));
+  },
+  { deep: true }
+);
+
+watch(
+  labels,
+  (value) => {
+    localStorage.setItem("mailLabels", JSON.stringify(value));
+  },
+  { deep: true }
+);
+
 const folders = [
   { name: "收件箱", count: 42, icon: "inbox", active: true },
   { name: "星标", count: 12, icon: "star" },
@@ -125,11 +244,9 @@ const folders = [
   { name: "垃圾邮件", count: 26, icon: "trash" }
 ];
 
-const labels = [
-  { name: "重要", tone: "danger" },
-  { name: "工作", tone: "work" },
-  { name: "个人", tone: "personal" }
-];
+const systemMenus = [{ name: "设置", icon: "settings" }];
+
+
 
 const tools = [
   { name: "刷新", icon: "refresh" },
@@ -216,9 +333,10 @@ const todos = ref([
       <el-header class="topbar">
         <div class="brand">邮箱客户端</div>
         <div class="topbar-actions">
-          <el-button class="compose-btn" type="primary" @click="composeVisible = true">
+          <el-button class="compose-btn" type="primary" @click="openComposeNew">
             写邮件
           </el-button>
+
           <el-input
             class="search-input"
             size="small"
@@ -231,7 +349,8 @@ const todos = ref([
       <el-container class="body">
         <el-aside width="200px" class="sidebar">
           <div class="section-title">邮箱</div>
-          <el-menu class="nav" :default-active="folders[0].name">
+          <el-menu class="nav" :default-active="activeMenu" @select="handleMenuSelect">
+
             <el-menu-item
               v-for="folder in folders"
               :key="folder.name"
@@ -246,56 +365,81 @@ const todos = ref([
 
           <div class="section-title labels">标签</div>
           <div class="label-list">
-            <div v-for="label in labels" :key="label.name" class="label-item">
+            <div v-for="label in labelsWithTone" :key="label.name" class="label-item">
               <span class="label-dot" :class="`tone-${label.tone}`"></span>
               <span>{{ label.name }}</span>
             </div>
           </div>
+
+
+          <div class="section-title system">系统</div>
+          <el-menu class="nav system-nav" :default-active="activeMenu" @select="handleMenuSelect">
+            <el-menu-item
+              v-for="menu in systemMenus"
+              :key="menu.name"
+              :index="menu.name"
+            >
+              <span class="nav-icon" :class="`icon-${menu.icon}`"></span>
+              <span class="nav-text">{{ menu.name }}</span>
+            </el-menu-item>
+          </el-menu>
         </el-aside>
 
-        <el-main class="main">
-          <div class="toolbar">
-            <el-checkbox class="tool-check">全选</el-checkbox>
-            <el-button v-for="tool in tools" :key="tool.name" link class="tool-btn">
-              <span class="tool-icon" :class="`tool-${tool.icon}`"></span>
-              {{ tool.name }}
-            </el-button>
-          </div>
 
-          <div class="mail-list">
-            <div
-              v-for="mail in mails"
-              :key="mail.subject"
-              class="mail-row"
-              :class="{ active: mail.active }"
-              @dblclick="openMailDetail(mail)"
-            >
-              <el-checkbox class="row-check" />
-              <span class="star" :class="{ starred: mail.starred }">★</span>
-              <span class="sender">{{ mail.sender }}</span>
-              <div class="subject">
-                <span class="subject-title">{{ mail.subject }}</span>
-                <span class="subject-preview"> - {{ mail.preview }}</span>
-              </div>
-              <el-tag
-                v-if="mail.tag"
-                class="tag"
-                :class="`tag-${mail.tag}`"
-                size="small"
-                effect="light"
-              >
-                {{ mail.tag }}
-              </el-tag>
-              <span v-else class="tag tag-empty">&nbsp;</span>
-              <el-button class="todo-action" link @click.stop="addTodoFromMail(mail)">
-                设为待办
+        <el-main class="main">
+          <div v-if="currentView === 'mail'">
+            <div class="toolbar">
+              <el-checkbox class="tool-check">全选</el-checkbox>
+              <el-button v-for="tool in tools" :key="tool.name" link class="tool-btn">
+                <span class="tool-icon" :class="`tool-${tool.icon}`"></span>
+                {{ tool.name }}
               </el-button>
-              <span class="time">{{ mail.time }}</span>
+            </div>
+
+            <div class="mail-list">
+              <div
+                v-for="mail in mails"
+                :key="mail.subject"
+                class="mail-row"
+                :class="{ active: mail.active }"
+                @dblclick="openMailDetail(mail)"
+              >
+                <el-checkbox class="row-check" />
+                <span class="star" :class="{ starred: mail.starred }">★</span>
+                <span class="sender">{{ mail.sender }}</span>
+                <div class="subject">
+                  <span class="subject-title">{{ mail.subject }}</span>
+                  <span class="subject-preview"> - {{ mail.preview }}</span>
+                </div>
+                <el-tag
+                  v-if="mail.tag"
+                  class="tag"
+                  :class="`tag-${mail.tag}`"
+                  size="small"
+                  effect="light"
+                >
+                  {{ mail.tag }}
+                </el-tag>
+                <span v-else class="tag tag-empty">&nbsp;</span>
+                <el-button class="todo-action" link @click.stop="addTodoFromMail(mail)">
+                  设为待办
+                </el-button>
+                <span class="time">{{ mail.time }}</span>
+              </div>
             </div>
           </div>
+
+          <SettingsView
+            v-else
+            class="settings-view"
+            v-model:labels="labels"
+            v-model:settings="settings"
+          />
+
         </el-main>
 
-        <el-aside class="todo-panel">
+        <el-aside v-if="currentView === 'mail'" class="todo-panel">
+
           <div class="todo-header">
             <span class="todo-title">待办列表</span>
             <el-tag size="small" effect="light" type="info">{{ todos.length }}</el-tag>
@@ -446,6 +590,11 @@ const todos = ref([
   margin-top: 12px;
 }
 
+.section-title.system {
+  margin-top: 16px;
+}
+
+
 .nav {
   border-right: none;
   background: transparent;
@@ -540,6 +689,15 @@ const todos = ref([
   left: 4px;
 }
 
+.nav-icon.icon-settings::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  border-radius: 50%;
+}
+
+
 .nav-badge {
   margin-left: auto;
 }
@@ -595,6 +753,11 @@ const todos = ref([
 .label-dot.tone-personal {
   background: #38b36b;
 }
+
+.label-dot.tone-default {
+  background: #7a8aa6;
+}
+
 
 .main {
   padding: 16px;
@@ -817,6 +980,17 @@ const todos = ref([
   color: #4c5b75;
   white-space: pre-wrap;
 }
+
+.mail-signature {
+  color: #7a8aa6;
+}
+
+.mail-signature img {
+  max-width: 140px;
+  height: auto;
+  display: inline-block;
+}
+
 
 .todo-panel {
   width: 260px;
