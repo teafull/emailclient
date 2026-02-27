@@ -3,7 +3,9 @@ import { ref, nextTick, computed, watch } from "vue";
 
 import { ElMessage } from "element-plus";
 import ComposeMail from "./ComposeMail.vue";
+import ContactsView from "./ContactsView.vue";
 import SettingsView from "./SettingsView.vue";
+
 
 const composeVisible = ref(false);
 const composeRef = ref(null);
@@ -14,8 +16,17 @@ const activeMenu = ref("收件箱");
 
 const handleMenuSelect = (index) => {
   activeMenu.value = index;
-  currentView.value = index === "设置" ? "settings" : "mail";
+  if (index === "设置") {
+    currentView.value = "settings";
+    return;
+  }
+  if (index === "通讯录") {
+    currentView.value = "contacts";
+    return;
+  }
+  currentView.value = "mail";
 };
+
 
 const openMailDetail = (mail) => {
   selectedMail.value = mail;
@@ -226,7 +237,9 @@ const defaultSettings = {
   displayName: "张三",
   title: "市场与运营部",
   email: "zhangsan@company.com",
+  emailPassword: "",
   signature: "张三\n市场与运营部\n电话：010-12345678",
+
   signatureHtml: "张三<br />市场与运营部<br />电话：010-12345678",
   notify: true,
   autoDraft: true,
@@ -263,6 +276,76 @@ const getSignatureHtml = () => {
 
 const labels = ref(readStorage("mailLabels", ["重要", "工作", "个人"]).filter(Boolean));
 
+const contacts = ref(
+  readStorage("mailContacts", [
+    {
+      id: "contact-001",
+      name: "李婷",
+      email: "liting@company.com",
+      phone: "138-0000-2345",
+      department: "市场部",
+      position: "市场经理",
+      group: "客户",
+      tag: "VIP",
+      notes: "重点客户，偏好月度总结",
+      starred: true
+    },
+    {
+      id: "contact-002",
+      name: "周铭",
+      email: "zhouming@company.com",
+      phone: "139-1122-5566",
+      department: "产品部",
+      position: "产品负责人",
+      group: "内部",
+      tag: "项目",
+      notes: "对接 CRM 项目",
+      starred: false
+    },
+    {
+      id: "contact-003",
+      name: "王珊",
+      email: "wangshan@company.com",
+      phone: "137-8899-7788",
+      department: "人力资源",
+      position: "HRBP",
+      group: "内部",
+      tag: "招聘",
+      notes: "校招项目跟进",
+      starred: false
+    },
+    {
+      id: "contact-004",
+      name: "陈宇",
+      email: "chenyu@company.com",
+      phone: "136-5566-8899",
+      department: "客户成功",
+      position: "客户成功经理",
+      group: "客户",
+      tag: "续约",
+      notes: "合同将于下月到期",
+      starred: true
+    }
+  ])
+);
+
+const ldapSettings = ref(
+  readStorage("mailContactsLdap", {
+    enabled: false,
+    host: "ldap.company.com",
+    port: 389,
+    baseDn: "dc=company,dc=com",
+    bindDn: "cn=admin,dc=company,dc=com",
+    password: "",
+    autoSync: false,
+    syncInterval: "手动",
+    lastSync: "",
+    status: "未连接"
+  })
+);
+
+
+
 const labelToneMap = {
   重要: "danger",
   工作: "work",
@@ -292,6 +375,24 @@ watch(
   { deep: true }
 );
 
+watch(
+  contacts,
+  (value) => {
+    localStorage.setItem("mailContacts", JSON.stringify(value));
+  },
+  { deep: true }
+);
+
+watch(
+  ldapSettings,
+  (value) => {
+    localStorage.setItem("mailContactsLdap", JSON.stringify(value));
+  },
+  { deep: true }
+);
+
+
+
 const folders = [
   { name: "收件箱", count: 42, icon: "inbox", active: true },
   { name: "星标", count: 12, icon: "star" },
@@ -300,7 +401,11 @@ const folders = [
   { name: "垃圾邮件", count: 26, icon: "trash" }
 ];
 
-const systemMenus = [{ name: "设置", icon: "settings" }];
+const systemMenus = [
+  { name: "通讯录", icon: "contacts" },
+  { name: "设置", icon: "settings" }
+];
+
 
 
 
@@ -487,12 +592,21 @@ const todos = ref([
             </div>
           </div>
 
+          <ContactsView
+            v-else-if="currentView === 'contacts'"
+            class="contacts-view"
+            v-model:contacts="contacts"
+            v-model:ldapSettings="ldapSettings"
+          />
+
+
           <SettingsView
             v-else
             class="settings-view"
             v-model:labels="labels"
             v-model:settings="settings"
           />
+
 
         </el-main>
 
@@ -770,6 +884,29 @@ const todos = ref([
   left: 4px;
 }
 
+.nav-icon.icon-contacts::after {
+  content: "";
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  border-radius: 50%;
+  top: 3px;
+  left: 3px;
+}
+
+.nav-icon.icon-contacts::before {
+  content: "";
+  position: absolute;
+  width: 10px;
+  height: 5px;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  border-top: 0;
+  border-radius: 0 0 8px 8px;
+  bottom: 2px;
+  left: 2px;
+}
+
 .nav-icon.icon-settings::after {
   content: "";
   position: absolute;
@@ -777,6 +914,7 @@ const todos = ref([
   border: 2px solid rgba(255, 255, 255, 0.85);
   border-radius: 50%;
 }
+
 
 
 .nav-badge {

@@ -213,6 +213,15 @@ const themeOptions = ["专业蓝", "深邃蓝", "极简白"];
         <el-form-item label="邮箱">
           <el-input v-model="localSettings.email" placeholder="请输入邮箱" />
         </el-form-item>
+        <el-form-item label="邮箱密码">
+          <el-input
+            v-model="localSettings.emailPassword"
+            type="password"
+            show-password
+            placeholder="请输入邮箱密码"
+          />
+        </el-form-item>
+
       </el-form>
     </el-card>
 
@@ -317,20 +326,30 @@ const themeOptions = ["专业蓝", "深邃蓝", "极简白"];
   display: flex;
   flex-wrap: wrap;
   gap: 16px;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
 }
 
 .settings-header {
   flex: 0 0 100%;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .settings-card {
   flex: 1 1 320px;
-  min-width: 280px;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .settings-card--wide {
   flex: 2 1 520px;
+  max-width: 100%;
 }
+
 
 
 
