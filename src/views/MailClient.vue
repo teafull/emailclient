@@ -154,7 +154,7 @@ const todos = [
 
 
       <el-container class="body">
-        <el-aside width="220px" class="sidebar">
+        <el-aside width="200px" class="sidebar">
           <div class="section-title">邮箱</div>
           <el-menu class="nav" :default-active="folders[0].name">
             <el-menu-item
@@ -217,7 +217,7 @@ const todos = [
           </div>
         </el-main>
 
-        <el-aside width="260px" class="todo-panel">
+        <el-aside class="todo-panel">
           <div class="todo-header">
             <span class="todo-title">待办列表</span>
             <el-tag size="small" effect="light" type="info">{{ todos.length }}</el-tag>
@@ -688,7 +688,7 @@ const todos = [
 }
 
 .todo-panel {
-  width: 260px;
+  width: 240px;
   background: #fff;
   border: 1px solid #e5ecf6;
   border-radius: 10px;
