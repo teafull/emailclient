@@ -1,10 +1,80 @@
 <script setup>
-import { ref } from "vue";
+import { ref, nextTick } from "vue";
 import { ElMessage } from "element-plus";
 import ComposeMail from "./ComposeMail.vue";
 
 const composeVisible = ref(false);
 const composeRef = ref(null);
+const detailVisible = ref(false);
+const selectedMail = ref(null);
+
+const openMailDetail = (mail) => {
+  selectedMail.value = mail;
+  detailVisible.value = true;
+};
+
+const prefixSubject = (prefix, subject) => {
+  if (!subject) {
+    return prefix.trim();
+  }
+  return subject.startsWith(prefix) ? subject : `${prefix}${subject}`;
+};
+
+const openComposeWithAction = async (action) => {
+  const mail = selectedMail.value;
+  if (!mail) {
+    return;
+  }
+  composeVisible.value = true;
+  await nextTick();
+  const form = composeRef.value?.form;
+  if (!form) {
+    return;
+  }
+  form.to = "";
+  form.cc = "";
+  form.subject = "";
+  form.content = "";
+
+  const signature = "\n\n--\n张风\n市场与运营部\n电话：010-12345678";
+  const replyQuote = `\n\n在 ${mail.time}，${mail.sender} 写道：\n> ${(mail.content || mail.preview).replace(/\n/g, "\n> ")}`;
+  const forwardQuote = `\n\n--- 转发邮件 ---\n发件人：${mail.sender}\n时间：${mail.time}\n主题：${mail.subject}\n\n${mail.content || mail.preview}`;
+
+  if (action === "reply") {
+    form.to = mail.email || "";
+    form.subject = prefixSubject("Re: ", mail.subject);
+    form.content = `${replyQuote}${signature}`;
+    return;
+  }
+
+  if (action === "replyAll") {
+    form.to = mail.email || "";
+    form.cc = mail.cc || "";
+    form.subject = prefixSubject("Re: ", mail.subject);
+    form.content = `${replyQuote}${signature}`;
+    return;
+  }
+
+  if (action === "forward") {
+    form.subject = prefixSubject("Fwd: ", mail.subject);
+    form.content = `${forwardQuote}${signature}`;
+  }
+};
+
+
+const addTodoFromMail = (mail) => {
+  if (!mail) {
+    return;
+  }
+  const newTodo = {
+    title: `跟进：${mail.subject}`,
+    source: mail.sender,
+    time: new Date().toLocaleString(),
+    status: "待处理"
+  };
+  todos.value.unshift(newTodo);
+  ElMessage.success("已加入待办");
+};
 
 const handleSend = async () => {
   try {
@@ -20,7 +90,6 @@ const handleSend = async () => {
 };
 
 const saveDraft = () => {
-
   const form = composeRef.value?.form;
   if (!form) {
     return;
@@ -48,9 +117,7 @@ const saveDraft = () => {
   ElMessage.success("草稿已保存");
 };
 
-
 const folders = [
-
   { name: "收件箱", count: 42, icon: "inbox", active: true },
   { name: "星标", count: 12, icon: "star" },
   { name: "已发送", count: 128, icon: "send" },
@@ -74,8 +141,12 @@ const tools = [
 const mails = [
   {
     sender: "技术支持团队",
+    email: "support@company.com",
+    cc: "ops@company.com",
     subject: "系统维护通知",
     preview: "本周六凌晨2:00-4:00将进行系统维护...",
+    content:
+      "您好，为确保系统稳定运行，本周六凌晨2:00-4:00将进行系统维护。期间可能出现短暂不可用，敬请谅解。如有紧急问题请联系技术支持。",
     tag: "重要",
     time: "今天 09:30",
     starred: true,
@@ -83,8 +154,11 @@ const mails = [
   },
   {
     sender: "设计部门",
+    email: "design@company.com",
+    cc: "pm@company.com",
     subject: "新版本UI设计稿反馈",
     preview: "请查看附件中的设计稿并提供反馈意见...",
+    content: "新版本UI设计稿已更新，请重点关注导航与列表样式。期待今天下午前给出反馈建议。",
     tag: "工作",
     time: "今天 08:45",
     starred: false,
@@ -92,8 +166,10 @@ const mails = [
   },
   {
     sender: "人力资源部",
+    email: "hr@company.com",
     subject: "团队建设活动邀请",
     preview: "本周五下午将举办季度团队建设活动...",
+    content: "本周五下午将举办季度团队建设活动，请在今天18:00前完成报名并填写饮食偏好。",
     tag: "",
     time: "昨天 16:20",
     starred: false,
@@ -101,8 +177,10 @@ const mails = [
   },
   {
     sender: "财务部门",
+    email: "finance@company.com",
     subject: "工资单已发布",
     preview: "本月工资单已生成，请及时查看...",
+    content: "本月工资单已发布，请在系统中查看并确认。如有疑问请联系财务。",
     tag: "",
     time: "昨天 14:15",
     starred: false,
@@ -110,7 +188,7 @@ const mails = [
   }
 ];
 
-const todos = [
+const todos = ref([
   {
     title: "回复系统维护通知",
     source: "技术支持团队",
@@ -129,9 +207,8 @@ const todos = [
     time: "明天 09:00",
     status: "待处理"
   }
-];
+]);
 </script>
-
 
 <template>
   <div class="mail-app">
@@ -142,7 +219,6 @@ const todos = [
           <el-button class="compose-btn" type="primary" @click="composeVisible = true">
             写邮件
           </el-button>
-
           <el-input
             class="search-input"
             size="small"
@@ -151,7 +227,6 @@ const todos = [
           />
         </div>
       </el-header>
-
 
       <el-container class="body">
         <el-aside width="200px" class="sidebar">
@@ -193,6 +268,7 @@ const todos = [
               :key="mail.subject"
               class="mail-row"
               :class="{ active: mail.active }"
+              @dblclick="openMailDetail(mail)"
             >
               <el-checkbox class="row-check" />
               <span class="star" :class="{ starred: mail.starred }">★</span>
@@ -211,7 +287,9 @@ const todos = [
                 {{ mail.tag }}
               </el-tag>
               <span v-else class="tag tag-empty">&nbsp;</span>
-              <el-button class="todo-action" link>设为待办</el-button>
+              <el-button class="todo-action" link @click.stop="addTodoFromMail(mail)">
+                设为待办
+              </el-button>
               <span class="time">{{ mail.time }}</span>
             </div>
           </div>
@@ -240,8 +318,6 @@ const todos = [
             </el-card>
           </div>
         </el-aside>
-
-
       </el-container>
 
       <el-dialog v-model="composeVisible" title="写邮件" width="720px">
@@ -250,14 +326,37 @@ const todos = [
           <el-button @click="composeVisible = false">取消</el-button>
           <el-button @click="saveDraft">保存草稿</el-button>
           <el-button type="primary" @click="handleSend">发送</el-button>
-
         </template>
       </el-dialog>
 
+      <el-dialog v-model="detailVisible" title="邮件详情" width="620px">
+        <div v-if="selectedMail" class="detail-body">
+          <div class="detail-actions">
+            <el-button size="small" @click="openComposeWithAction('reply')">回复</el-button>
+            <el-button size="small" @click="openComposeWithAction('replyAll')">
+              全部回复
+            </el-button>
+            <el-button size="small" @click="openComposeWithAction('forward')">转发</el-button>
+            <el-button size="small" @click="addTodoFromMail(selectedMail)">
+              设为待办
+            </el-button>
+          </div>
+          <div class="detail-title">{{ selectedMail.subject }}</div>
+          <div class="detail-meta">
+            <span>发件人：{{ selectedMail.sender }}</span>
+            <span>时间：{{ selectedMail.time }}</span>
+          </div>
+          <div class="detail-content">
+            {{ selectedMail.content || selectedMail.preview }}
+          </div>
+        </div>
+        <template #footer>
+          <el-button type="primary" @click="detailVisible = false">关闭</el-button>
+        </template>
+      </el-dialog>
     </el-container>
   </div>
 </template>
-
 
 <style scoped>
 .mail-app {
@@ -307,7 +406,6 @@ const todos = [
 .search-input {
   width: 220px;
 }
-
 
 .search-input :deep(.el-input__wrapper) {
   border-radius: 18px;
@@ -506,7 +604,6 @@ const todos = [
   min-width: 0;
 }
 
-
 .toolbar {
   display: flex;
   align-items: center;
@@ -516,8 +613,6 @@ const todos = [
   border: 1px solid #e5ecf6;
   border-radius: 10px;
 }
-
-
 
 .tool-check :deep(.el-checkbox__label) {
   color: #6b7b94;
@@ -604,13 +699,17 @@ const todos = [
   border-top: 1px solid #eef2f7;
 }
 
-
 .mail-row:first-child {
   border-top: none;
 }
 
 .mail-row.active {
   background: #edf3ff;
+}
+
+.mail-row:hover {
+  background: #f5f8ff;
+  cursor: pointer;
 }
 
 .row-check :deep(.el-checkbox__inner) {
@@ -687,8 +786,40 @@ const todos = [
   font-size: 12px;
 }
 
+.detail-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  color: #2f3d55;
+}
+
+.detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.detail-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.detail-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #8a98b2;
+}
+
+.detail-content {
+  font-size: 13px;
+  line-height: 1.8;
+  color: #4c5b75;
+  white-space: pre-wrap;
+}
+
 .todo-panel {
-  width: 240px;
+  width: 260px;
   background: #fff;
   border: 1px solid #e5ecf6;
   border-radius: 10px;
@@ -699,7 +830,6 @@ const todos = [
   margin: 16px 16px 16px 0;
   height: fit-content;
 }
-
 
 .todo-header {
   display: flex;
@@ -743,5 +873,4 @@ const todos = [
   font-size: 12px;
   color: #8a98b2;
 }
-
 </style>
