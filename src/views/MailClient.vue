@@ -1,0 +1,747 @@
+<script setup>
+import { ref } from "vue";
+import { ElMessage } from "element-plus";
+import ComposeMail from "./ComposeMail.vue";
+
+const composeVisible = ref(false);
+const composeRef = ref(null);
+
+const handleSend = async () => {
+  try {
+    await composeRef.value?.validate();
+    ElMessage.success("邮件已发送");
+    composeRef.value?.resetForm();
+    composeVisible.value = false;
+  } catch (error) {
+    if (error) {
+      ElMessage.warning("请完善必填项后再发送");
+    }
+  }
+};
+
+const saveDraft = () => {
+
+  const form = composeRef.value?.form;
+  if (!form) {
+    return;
+  }
+  const hasContent = form.to || form.cc || form.subject || form.content;
+  if (!hasContent) {
+    ElMessage.warning("草稿内容为空");
+    return;
+  }
+  const draft = {
+    to: form.to,
+    cc: form.cc,
+    subject: form.subject,
+    content: form.content,
+    time: new Date().toLocaleString()
+  };
+  let drafts = [];
+  try {
+    drafts = JSON.parse(localStorage.getItem("mailDrafts") || "[]");
+  } catch (error) {
+    drafts = [];
+  }
+  drafts.unshift(draft);
+  localStorage.setItem("mailDrafts", JSON.stringify(drafts));
+  ElMessage.success("草稿已保存");
+};
+
+
+const folders = [
+
+  { name: "收件箱", count: 42, icon: "inbox", active: true },
+  { name: "星标", count: 12, icon: "star" },
+  { name: "已发送", count: 128, icon: "send" },
+  { name: "草稿", count: 5, icon: "draft" },
+  { name: "垃圾邮件", count: 26, icon: "trash" }
+];
+
+const labels = [
+  { name: "重要", tone: "danger" },
+  { name: "工作", tone: "work" },
+  { name: "个人", tone: "personal" }
+];
+
+const tools = [
+  { name: "刷新", icon: "refresh" },
+  { name: "删除", icon: "delete" },
+  { name: "移动", icon: "move" },
+  { name: "标记为已读", icon: "read" }
+];
+
+const mails = [
+  {
+    sender: "技术支持团队",
+    subject: "系统维护通知",
+    preview: "本周六凌晨2:00-4:00将进行系统维护...",
+    tag: "重要",
+    time: "今天 09:30",
+    starred: true,
+    active: true
+  },
+  {
+    sender: "设计部门",
+    subject: "新版本UI设计稿反馈",
+    preview: "请查看附件中的设计稿并提供反馈意见...",
+    tag: "工作",
+    time: "今天 08:45",
+    starred: false,
+    active: false
+  },
+  {
+    sender: "人力资源部",
+    subject: "团队建设活动邀请",
+    preview: "本周五下午将举办季度团队建设活动...",
+    tag: "",
+    time: "昨天 16:20",
+    starred: false,
+    active: false
+  },
+  {
+    sender: "财务部门",
+    subject: "工资单已发布",
+    preview: "本月工资单已生成，请及时查看...",
+    tag: "",
+    time: "昨天 14:15",
+    starred: false,
+    active: false
+  }
+];
+
+const todos = [
+  {
+    title: "回复系统维护通知",
+    source: "技术支持团队",
+    time: "今天 10:30",
+    status: "进行中"
+  },
+  {
+    title: "跟进设计稿反馈",
+    source: "设计部门",
+    time: "今天 14:00",
+    status: "待处理"
+  },
+  {
+    title: "确认团队建设报名",
+    source: "人力资源部",
+    time: "明天 09:00",
+    status: "待处理"
+  }
+];
+</script>
+
+
+<template>
+  <div class="mail-app">
+    <el-container class="layout">
+      <el-header class="topbar">
+        <div class="brand">邮箱客户端</div>
+        <div class="topbar-actions">
+          <el-button class="compose-btn" type="primary" @click="composeVisible = true">
+            写邮件
+          </el-button>
+
+          <el-input
+            class="search-input"
+            size="small"
+            placeholder="搜索邮件..."
+            clearable
+          />
+        </div>
+      </el-header>
+
+
+      <el-container class="body">
+        <el-aside width="220px" class="sidebar">
+          <div class="section-title">邮箱</div>
+          <el-menu class="nav" :default-active="folders[0].name">
+            <el-menu-item
+              v-for="folder in folders"
+              :key="folder.name"
+              :index="folder.name"
+              :class="{ active: folder.active }"
+            >
+              <span class="nav-icon" :class="`icon-${folder.icon}`"></span>
+              <span class="nav-text">{{ folder.name }}</span>
+              <el-badge class="nav-badge" :value="folder.count" :max="999" />
+            </el-menu-item>
+          </el-menu>
+
+          <div class="section-title labels">标签</div>
+          <div class="label-list">
+            <div v-for="label in labels" :key="label.name" class="label-item">
+              <span class="label-dot" :class="`tone-${label.tone}`"></span>
+              <span>{{ label.name }}</span>
+            </div>
+          </div>
+        </el-aside>
+
+        <el-main class="main">
+          <div class="toolbar">
+            <el-checkbox class="tool-check">全选</el-checkbox>
+            <el-button v-for="tool in tools" :key="tool.name" link class="tool-btn">
+              <span class="tool-icon" :class="`tool-${tool.icon}`"></span>
+              {{ tool.name }}
+            </el-button>
+          </div>
+
+          <div class="mail-list">
+            <div
+              v-for="mail in mails"
+              :key="mail.subject"
+              class="mail-row"
+              :class="{ active: mail.active }"
+            >
+              <el-checkbox class="row-check" />
+              <span class="star" :class="{ starred: mail.starred }">★</span>
+              <span class="sender">{{ mail.sender }}</span>
+              <div class="subject">
+                <span class="subject-title">{{ mail.subject }}</span>
+                <span class="subject-preview"> - {{ mail.preview }}</span>
+              </div>
+              <el-tag
+                v-if="mail.tag"
+                class="tag"
+                :class="`tag-${mail.tag}`"
+                size="small"
+                effect="light"
+              >
+                {{ mail.tag }}
+              </el-tag>
+              <span v-else class="tag tag-empty">&nbsp;</span>
+              <el-button class="todo-action" link>设为待办</el-button>
+              <span class="time">{{ mail.time }}</span>
+            </div>
+          </div>
+        </el-main>
+
+        <el-aside width="260px" class="todo-panel">
+          <div class="todo-header">
+            <span class="todo-title">待办列表</span>
+            <el-tag size="small" effect="light" type="info">{{ todos.length }}</el-tag>
+          </div>
+          <div class="todo-list">
+            <el-card
+              v-for="todo in todos"
+              :key="todo.title"
+              class="todo-card"
+              shadow="never"
+            >
+              <div class="todo-card-title">{{ todo.title }}</div>
+              <div class="todo-card-meta">
+                <span>{{ todo.source }}</span>
+                <span>{{ todo.time }}</span>
+              </div>
+              <el-tag size="small" type="primary" effect="light">
+                {{ todo.status }}
+              </el-tag>
+            </el-card>
+          </div>
+        </el-aside>
+
+
+      </el-container>
+
+      <el-dialog v-model="composeVisible" title="写邮件" width="720px">
+        <ComposeMail ref="composeRef" />
+        <template #footer>
+          <el-button @click="composeVisible = false">取消</el-button>
+          <el-button @click="saveDraft">保存草稿</el-button>
+          <el-button type="primary" @click="handleSend">发送</el-button>
+
+        </template>
+      </el-dialog>
+
+    </el-container>
+  </div>
+</template>
+
+
+<style scoped>
+.mail-app {
+  min-height: 100vh;
+  background: #f2f5fb;
+  --el-color-primary: #1f6fe5;
+  --el-color-primary-light-3: #6ea3ff;
+  --el-color-primary-light-7: #dbe8ff;
+}
+
+.layout {
+  min-height: 100vh;
+}
+
+.topbar {
+  height: 64px;
+  background: linear-gradient(90deg, #1d63d8 0%, #1f73ea 100%);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  box-shadow: 0 6px 16px rgba(25, 74, 150, 0.24);
+}
+
+.brand {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.compose-btn {
+  border-radius: 16px;
+  padding: 0 16px;
+  height: 32px;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 6px 14px rgba(25, 88, 180, 0.24);
+}
+
+.search-input {
+  width: 220px;
+}
+
+
+.search-input :deep(.el-input__wrapper) {
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.2);
+  box-shadow: none;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.search-input :deep(.el-input__inner) {
+  color: #fff;
+  font-size: 13px;
+}
+
+.search-input :deep(.el-input__inner::placeholder) {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.body {
+  flex: 1;
+  background: #f2f5fb;
+}
+
+.sidebar {
+  background: #fff;
+  border-right: 1px solid #e5ecf6;
+  padding: 18px 12px 16px;
+}
+
+.section-title {
+  color: #91a1bc;
+  font-size: 12px;
+  font-weight: 600;
+  margin: 6px 10px;
+  letter-spacing: 1px;
+}
+
+.section-title.labels {
+  margin-top: 12px;
+}
+
+.nav {
+  border-right: none;
+  background: transparent;
+}
+
+.nav :deep(.el-menu-item) {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  color: #2d3b55;
+  font-size: 14px;
+  height: auto;
+  line-height: 1.4;
+  margin: 2px 4px;
+}
+
+.nav :deep(.el-menu-item.is-active) {
+  background: #e9f1ff;
+  color: #1f6fe5;
+  font-weight: 600;
+}
+
+.nav :deep(.el-menu-item:hover) {
+  background: #f3f7ff;
+}
+
+.nav-icon {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  background: #c8d6ee;
+  position: relative;
+}
+
+.el-menu-item.is-active .nav-icon {
+  background: #1f6fe5;
+}
+
+.nav-text {
+  flex: 1;
+}
+
+.nav-icon.icon-star::after {
+  content: "★";
+  color: #fff;
+  font-size: 10px;
+  position: absolute;
+  top: 1px;
+  left: 3px;
+}
+
+.nav-icon.icon-inbox::after {
+  content: "";
+  position: absolute;
+  inset: 4px 3px 3px;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  border-top: 0;
+  border-radius: 2px;
+}
+
+.nav-icon.icon-send::after {
+  content: "";
+  position: absolute;
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 7px solid rgba(255, 255, 255, 0.85);
+  top: 4px;
+  left: 5px;
+}
+
+.nav-icon.icon-draft::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  border-radius: 2px;
+}
+
+.nav-icon.icon-trash::after {
+  content: "";
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  border-top: 0;
+  border-radius: 0 0 2px 2px;
+  top: 5px;
+  left: 4px;
+}
+
+.nav-badge {
+  margin-left: auto;
+}
+
+.nav-badge :deep(.el-badge__content) {
+  background: #eef2f8;
+  color: #5b6d88;
+  border: none;
+  height: 18px;
+  min-width: 18px;
+  padding: 0 6px;
+  line-height: 18px;
+  transform: translate(0, 0);
+}
+
+.el-menu-item.is-active .nav-badge :deep(.el-badge__content) {
+  background: #1f6fe5;
+  color: #fff;
+}
+
+.label-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+  padding-left: 6px;
+}
+
+.label-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  font-size: 14px;
+  color: #2d3b55;
+}
+
+.label-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #d36b6b;
+}
+
+.label-dot.tone-danger {
+  background: #f05b5b;
+}
+
+.label-dot.tone-work {
+  background: #8b6fe7;
+}
+
+.label-dot.tone-personal {
+  background: #38b36b;
+}
+
+.main {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 14px;
+  background: #fff;
+  border: 1px solid #e5ecf6;
+  border-radius: 10px;
+}
+
+
+
+.tool-check :deep(.el-checkbox__label) {
+  color: #6b7b94;
+  font-size: 13px;
+}
+
+.tool-btn {
+  color: #6b7b94;
+  font-size: 13px;
+  padding: 0 4px;
+}
+
+.tool-icon {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border: 1.5px solid #b3c0d8;
+  position: relative;
+  margin-right: 6px;
+  display: inline-block;
+}
+
+.tool-icon.tool-refresh::after {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border: 2px solid #b3c0d8;
+  border-right-color: transparent;
+  border-radius: 50%;
+}
+
+.tool-icon.tool-delete::after {
+  content: "";
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border: 2px solid #b3c0d8;
+  border-top: 0;
+  border-radius: 0 0 2px 2px;
+  top: 3px;
+  left: 3px;
+}
+
+.tool-icon.tool-move::after {
+  content: "";
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border: 2px solid #b3c0d8;
+  border-right: 0;
+  border-bottom: 0;
+  transform: rotate(45deg);
+  top: 3px;
+  left: 4px;
+}
+
+.tool-icon.tool-read::after {
+  content: "";
+  position: absolute;
+  width: 6px;
+  height: 4px;
+  border: 2px solid #b3c0d8;
+  border-top: 0;
+  top: 4px;
+  left: 3px;
+}
+
+.mail-list {
+  flex: 1;
+  background: #fff;
+  border: 1px solid #e5ecf6;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.mail-row {
+  display: grid;
+  grid-template-columns: 26px 24px 160px 1fr 80px 90px 90px;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 16px;
+  font-size: 13px;
+  color: #2f3d55;
+  border-top: 1px solid #eef2f7;
+}
+
+
+.mail-row:first-child {
+  border-top: none;
+}
+
+.mail-row.active {
+  background: #edf3ff;
+}
+
+.row-check :deep(.el-checkbox__inner) {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border: 1.5px solid #b7c5dc;
+}
+
+.star {
+  font-size: 14px;
+  color: #c6d1e5;
+}
+
+.star.starred {
+  color: #f4b400;
+}
+
+.sender {
+  font-weight: 600;
+  color: #2b3a55;
+}
+
+.subject {
+  color: #5a6a84;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.subject-title {
+  color: #2f3d55;
+  font-weight: 600;
+}
+
+.subject-preview {
+  color: #7b8aa6;
+}
+
+.tag {
+  justify-self: end;
+  font-size: 12px;
+}
+
+.tag-重要 :deep(.el-tag) {
+  background: #ffe9e9;
+  color: #e05757;
+  border-color: transparent;
+}
+
+.tag-工作 :deep(.el-tag) {
+  background: #efe8ff;
+  color: #7c5ce2;
+  border-color: transparent;
+}
+
+.tag-empty {
+  background: transparent;
+}
+
+.todo-action {
+  justify-self: end;
+  font-size: 12px;
+  color: #1f6fe5;
+}
+
+.todo-action:hover {
+  color: #1b61cc;
+}
+
+.time {
+  justify-self: end;
+  color: #8696b0;
+  font-size: 12px;
+}
+
+.todo-panel {
+  width: 260px;
+  background: #fff;
+  border: 1px solid #e5ecf6;
+  border-radius: 10px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 16px 16px 16px 0;
+  height: fit-content;
+}
+
+
+.todo-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.todo-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #2d3b55;
+}
+
+.todo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.todo-card {
+  border-radius: 10px;
+  border-color: #eef2f7;
+}
+
+.todo-card :deep(.el-card__body) {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.todo-card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #2f3d55;
+}
+
+.todo-card-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #8a98b2;
+}
+
+</style>
