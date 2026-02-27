@@ -7,8 +7,12 @@ const form = reactive({
   to: "",
   cc: "",
   subject: "",
-  content: ""
+  content: "",
+  attachments: []
 });
+
+const fileList = ref([]);
+
 
 const getPlainText = (html) => {
   const container = document.createElement("div");
@@ -42,6 +46,45 @@ const updateContent = () => {
   formRef.value?.validateField("content");
 };
 
+const uploadTimers = new Map();
+
+const startProgress = (file) => {
+  if (uploadTimers.has(file.uid)) {
+    return;
+  }
+  file.status = "uploading";
+  file.percentage = file.percentage || 0;
+  const timer = window.setInterval(() => {
+    if (file.percentage >= 100) {
+      window.clearInterval(timer);
+      uploadTimers.delete(file.uid);
+      file.status = "success";
+      file.percentage = 100;
+      return;
+    }
+    file.percentage = Math.min(100, file.percentage + Math.ceil(Math.random() * 18));
+  }, 300);
+  uploadTimers.set(file.uid, timer);
+};
+
+const handleFileChange = (file, files) => {
+  fileList.value = files;
+  form.attachments = files;
+  startProgress(file);
+};
+
+const handleFileRemove = (file, files) => {
+  const timer = uploadTimers.get(file.uid);
+  if (timer) {
+    window.clearInterval(timer);
+    uploadTimers.delete(file.uid);
+  }
+  fileList.value = files;
+  form.attachments = files;
+};
+
+
+
 const syncEditorContent = async () => {
   await nextTick();
   if (editorRef.value && editorRef.value.innerHTML !== form.content) {
@@ -71,7 +114,13 @@ const resetForm = () => {
   if (editorRef.value) {
     editorRef.value.innerHTML = "";
   }
+  uploadTimers.forEach((timer) => window.clearInterval(timer));
+  uploadTimers.clear();
+  fileList.value = [];
+  form.attachments = [];
 };
+
+
 
 defineExpose({
   form,
@@ -116,8 +165,23 @@ defineExpose({
       <div class="compose-helper">支持富文本内容与签名图片</div>
     </el-form-item>
 
-
+    <el-form-item label="附件">
+      <el-upload
+        action="#"
+        :auto-upload="false"
+        :file-list="fileList"
+        :on-change="handleFileChange"
+        :on-remove="handleFileRemove"
+        class="compose-upload"
+      >
+        <el-button size="small" type="primary">添加附件</el-button>
+        <template #tip>
+          <div class="compose-helper">支持拖拽添加，多文件同时选择。</div>
+        </template>
+      </el-upload>
+    </el-form-item>
   </el-form>
+
 </template>
 
 <style scoped>
@@ -167,5 +231,19 @@ defineExpose({
   border-radius: 6px;
   margin: 6px 0;
 }
+
+.compose-upload :deep(.el-upload-list) {
+  margin-top: 8px;
+}
+
+.compose-upload :deep(.el-upload-list__item) {
+  align-items: center;
+}
+
+.compose-upload :deep(.el-progress) {
+  margin-top: 4px;
+}
+
+
 
 </style>
