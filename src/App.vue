@@ -18,12 +18,16 @@ import MailClient from "./views/MailClient.vue";
   -moz-osx-font-smoothing: grayscale;
 }
 
+html,
+body,
+#app {
+  height: 100%;
+  overflow: hidden;
+}
+
 body {
   margin: 0;
   background-color: #f2f5fb;
 }
 
-#app {
-  min-height: 100vh;
-}
 </style>

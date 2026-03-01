@@ -1,7 +1,9 @@
 <script setup>
 import { ref, nextTick, computed, watch } from "vue";
 
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ElMessage } from "element-plus";
+
 import ComposeMail from "./ComposeMail.vue";
 import ContactsView from "./ContactsView.vue";
 import SettingsView from "./SettingsView.vue";
@@ -13,6 +15,9 @@ const detailVisible = ref(false);
 const selectedMail = ref(null);
 const currentView = ref("mail");
 const activeMenu = ref("收件箱");
+const isTauriWindow = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+const appWindow = isTauriWindow ? getCurrentWindow() : null;
+
 
 const handleMenuSelect = (index) => {
   activeMenu.value = index;
@@ -27,8 +32,29 @@ const handleMenuSelect = (index) => {
   currentView.value = "mail";
 };
 
+const handleWindowMinimize = async () => {
+  if (!appWindow) {
+    return;
+  }
+  await appWindow.minimize();
+};
+
+const handleWindowToggleMaximize = async () => {
+  if (!appWindow) {
+    return;
+  }
+  await appWindow.toggleMaximize();
+};
+
+const handleWindowClose = async () => {
+  if (!appWindow) {
+    return;
+  }
+  await appWindow.close();
+};
 
 const openMailDetail = (mail) => {
+
   selectedMail.value = mail;
   detailVisible.value = true;
 };
@@ -494,7 +520,10 @@ const todos = ref([
   <div class="mail-app">
     <el-container class="layout">
       <el-header class="topbar">
-        <div class="brand">邮箱客户端</div>
+        <div class="topbar-brand" data-tauri-drag-region>
+          <div class="brand">邮箱客户端</div>
+        </div>
+        <div class="drag-region" data-tauri-drag-region></div>
         <div class="topbar-actions">
           <el-button class="compose-btn" type="primary" @click="openComposeNew">
             写邮件
@@ -507,7 +536,24 @@ const todos = ref([
             clearable
           />
         </div>
+        <div v-if="isTauriWindow" class="window-controls">
+          <button type="button" class="window-btn" aria-label="最小化" @click="handleWindowMinimize">
+            ─
+          </button>
+          <button
+            type="button"
+            class="window-btn"
+            aria-label="最大化"
+            @click="handleWindowToggleMaximize"
+          >
+            □
+          </button>
+          <button type="button" class="window-btn window-btn-close" aria-label="关闭" @click="handleWindowClose">
+            ×
+          </button>
+        </div>
       </el-header>
+
 
       <el-container class="body">
         <el-aside width="200px" class="sidebar">
@@ -698,8 +744,10 @@ const todos = ref([
 </template>
 
 <style scoped>
+
 .mail-app {
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   background: #f2f5fb;
   --el-color-primary: #1f6fe5;
   --el-color-primary-light-3: #6ea3ff;
@@ -707,8 +755,12 @@ const todos = ref([
 }
 
 .layout {
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
+  padding-top: 64px;
+  box-sizing: border-box;
 }
+
 
 .topbar {
   height: 64px;
@@ -716,15 +768,32 @@ const todos = ref([
   color: #fff;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 24px;
+  gap: 14px;
+  padding: 0 12px 0 18px;
   box-shadow: 0 6px 16px rgba(25, 74, 150, 0.24);
+  user-select: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 20;
+}
+
+.topbar-brand {
+  display: flex;
+  align-items: center;
 }
 
 .brand {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 600;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.4px;
+}
+
+.drag-region {
+  flex: 1;
+  min-width: 16px;
+  height: 100%;
 }
 
 .topbar-actions {
@@ -732,6 +801,32 @@ const todos = ref([
   align-items: center;
   gap: 12px;
 }
+
+.window-controls {
+  display: flex;
+  align-items: center;
+  margin-left: 4px;
+}
+
+.window-btn {
+  width: 34px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 14px;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.window-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.window-btn-close:hover {
+  background: #e14f4f;
+}
+
 
 .compose-btn {
   border-radius: 16px;
@@ -765,7 +860,13 @@ const todos = ref([
 .body {
   flex: 1;
   background: #f2f5fb;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
+
+
+
 
 .sidebar {
   background: #fff;
