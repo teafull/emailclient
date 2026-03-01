@@ -682,7 +682,14 @@ const todos = ref([
         </el-aside>
       </el-container>
 
-      <el-dialog v-model="composeVisible" title="写邮件" width="720px">
+      <el-dialog
+        v-model="composeVisible"
+        title="写邮件"
+        width="720px"
+        modal-class="mail-dialog-overlay"
+        :teleported="false"
+      >
+
         <ComposeMail ref="composeRef" />
         <template #footer>
           <el-button @click="composeVisible = false">取消</el-button>
@@ -693,7 +700,17 @@ const todos = ref([
       </el-dialog>
 
 
-      <el-dialog v-model="detailVisible" title="邮件详情" width="620px">
+      <el-dialog
+        v-model="detailVisible"
+        title="邮件详情"
+        width="620px"
+        class="mail-detail-dialog"
+        modal-class="mail-dialog-overlay"
+        :teleported="false"
+        :lock-scroll="false"
+      >
+
+
         <div v-if="selectedMail" class="detail-body">
           <div class="detail-actions">
             <el-button size="small" @click="openComposeWithAction('reply')">回复</el-button>
@@ -746,6 +763,7 @@ const todos = ref([
 <style scoped>
 
 .mail-app {
+  position: relative;
   height: 100vh;
   overflow: hidden;
   background: #f2f5fb;
@@ -753,6 +771,7 @@ const todos = ref([
   --el-color-primary-light-3: #6ea3ff;
   --el-color-primary-light-7: #dbe8ff;
 }
+
 
 .layout {
   height: 100vh;
@@ -863,12 +882,49 @@ const todos = ref([
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  position: relative;
+}
+
+:deep(.mail-dialog-overlay) {
+  top: 64px;
+  height: calc(100vh - 64px);
+  overflow: hidden;
+}
+
+:deep(.mail-dialog-overlay .el-overlay-dialog) {
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 16px;
+  box-sizing: border-box;
+}
+
+:deep(.mail-compose-dialog),
+:deep(.mail-detail-dialog) {
+  margin: 0;
+  max-height: calc(100vh - 96px);
+  display: flex;
+  flex-direction: column;
+}
+
+:deep(.mail-compose-dialog .el-dialog__body),
+:deep(.mail-detail-dialog .el-dialog__body) {
+  overflow-y: auto;
+}
+
+:deep(.mail-compose-dialog .el-dialog__body) {
+  max-height: calc(100vh - 220px);
+}
+
+:deep(.mail-detail-dialog .el-dialog__body) {
+  max-height: calc(100vh - 200px);
 }
 
 
-
-
 .sidebar {
+
   background: #fff;
   border-right: 1px solid #e5ecf6;
   padding: 18px 12px 16px;
