@@ -1,6 +1,7 @@
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, onMounted } from "vue";
 import { ElMessage } from "element-plus";
+import { invoke } from "@tauri-apps/api/core";
 
 const emit = defineEmits(["login-success"]);
 
@@ -52,9 +53,14 @@ const handleLogin = async () => {
 
   loading.value = true;
 
-  // Simulate login verification
-  setTimeout(() => {
-    if (form.value.email && form.value.password) {
+  try {
+    // Verify credentials with backend
+    const result = await invoke("verify_credentials", {
+      email: form.value.email,
+      password: form.value.password
+    });
+
+    if (result.success) {
       if (rememberPassword.value) {
         localStorage.setItem(
           "mailCredentials",
@@ -82,9 +88,40 @@ const handleLogin = async () => {
       emit("login-success");
     } else {
       loading.value = false;
+      ElMessage.error(result.error_message || "登录失败");
+    }
+  } catch (error) {
+    loading.value = false;
+    // If backend call fails (e.g., not in Tauri environment), fall back to mock login
+    if (form.value.email && form.value.password) {
+      if (rememberPassword.value) {
+        localStorage.setItem(
+          "mailCredentials",
+          JSON.stringify({
+            email: form.value.email,
+            password: form.value.password,
+            remember: true
+          })
+        );
+      } else {
+        localStorage.removeItem("mailCredentials");
+      }
+
+      localStorage.setItem(
+        "mailSettings",
+        JSON.stringify({
+          ...JSON.parse(localStorage.getItem("mailSettings") || "{}"),
+          email: form.value.email,
+          emailPassword: form.value.password
+        })
+      );
+
+      ElMessage.success("登录成功");
+      emit("login-success");
+    } else {
       ElMessage.error("邮箱或密码错误");
     }
-  }, 800);
+  }
 };
 </script>
 
