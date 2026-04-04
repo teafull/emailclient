@@ -651,6 +651,7 @@ const todos = ref([
             class="settings-view"
             v-model:labels="labels"
             v-model:settings="settings"
+            @logout="$emit('logout')"
           />
 
 

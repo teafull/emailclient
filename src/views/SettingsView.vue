@@ -12,8 +12,6 @@ const props = defineProps({
   }
 });
 
-const emit = defineEmits(["update:labels", "update:settings"]);
-
 const defaultLlm = {
   enabled: true,
   provider: "OpenAI",
@@ -192,6 +190,12 @@ const handleImageSelect = (event) => {
 };
 
 const themeOptions = ["专业蓝", "深邃蓝", "极简白"];
+
+const emit = defineEmits(["update:labels", "update:settings", "logout"]);
+
+const handleLogout = () => {
+  emit("logout");
+};
 </script>
 
 <template>
@@ -315,6 +319,9 @@ const themeOptions = ["专业蓝", "深邃蓝", "极简白"];
           <el-select v-model="localSettings.theme" placeholder="请选择主题" style="width: 180px">
             <el-option v-for="item in themeOptions" :key="item" :label="item" :value="item" />
           </el-select>
+        </el-form-item>
+        <el-form-item label="账号">
+          <el-button type="danger" size="small" @click="handleLogout">退出登录</el-button>
         </el-form-item>
       </el-form>
     </el-card>
